@@ -1,0 +1,16 @@
+{
+    "name": "SerializableSettings.Editor",
+    "rootNamespace": "SerializableSettings.Editor",
+    "references": [
+        "GUID:2e027413ea06621499e2f21ec1bff1e6"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
