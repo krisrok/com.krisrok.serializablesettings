@@ -1,6 +1,6 @@
-﻿using System;
+﻿#if !ODIN_INSPECTOR
+using System;
 
-#if !ODIN_INSPECTOR
 namespace SerializableSettings
 {
     // Stand-in for Odin's attribute for compatibility
