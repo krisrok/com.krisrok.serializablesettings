@@ -10,6 +10,60 @@ using UnityEngine;
 
 namespace SerializableSettings
 {
+    public class InMemoryOverrides
+    {
+        internal struct Item
+        {
+            public string Description;
+            public string Json;
+        }
+
+        internal static List<Item> UntypedOverrides = new List<Item>();
+
+        internal delegate void UntypedOverridesAddedDelegate(Item item);
+
+        internal static event UntypedOverridesAddedDelegate UntypedOverridesAdded;
+
+        //private static Dictionary<Type, string> _overrides;
+
+        /// <summary>
+        /// <para>
+        /// Add json contents which act the same way as Settings.json.
+        /// Every settings object has to be a top-level object of this structure.
+        /// </para>
+        /// <para>
+        /// Example: If you want to override two settings values, one in a class called FooSettings 
+        /// and another in a class called BarSettings, the json sould look something like this:
+        /// </para>
+        /// <code>
+        /// {
+        ///     "FooSettings":
+        ///     {
+        ///         "MyString": "Hello"
+        ///     },
+        ///     "BarSettings":
+        ///     {
+        ///         "MyInt": 303
+        ///     }
+        /// }
+        /// </code>
+        /// </summary>
+        /// <param name="json"></param>
+        /// <param name="description">Description of where the overrides come from, e.g. "Socket".</param>
+        public static void Add(string json, string description = null)
+        {
+            var item = new Item
+            {
+                Json = json,
+                Description = description
+            };
+
+            UntypedOverrides.Add(item);
+
+            UntypedOverridesAdded?.Invoke(item);
+        }
+    }
+
     public interface ISerializableSettings
     {
         void SaveAsJsonFile(string filename = null);
@@ -18,15 +72,18 @@ namespace SerializableSettings
 
     internal interface IOverridableSettings
     {
-        internal List<IOverrideOrigin> OverrideOrigins { get; set; }
-        internal bool UseOriginFileWatchers { get; set; }
+        internal bool IsRuntimeInstance { get; }
+        internal List<IOverrideOrigin> OverrideOrigins { get; }
+        internal OverrideOptions OverrideOptions { get; }
     }
 
-    public abstract class SerializableSettings<T> : Settings<T>, ISerializableSettings, IOverridableSettings
+    public abstract partial class SerializableSettings<T> : Settings<T>, ISerializableSettings, IOverridableSettings
         where T : SerializableSettings<T>
     {
         private static List<FileSystemWatcher> _originFileWatchers;
+        
         private static SynchronizationContext _syncContext;
+        private static Queue<Action> _syncContextQueue = new Queue<Action>();
 
         private static JsonSerializer _jsonSerializer;
         private static readonly JsonSerializerSettings _jsonSerializerSettings = new JsonSerializerSettings
@@ -36,305 +93,145 @@ namespace SerializableSettings
             Formatting = Formatting.Indented
         };
 
-        List<IOverrideOrigin> IOverridableSettings.OverrideOrigins { get; set; }
-        bool IOverridableSettings.UseOriginFileWatchers { get; set; }
+        [NonSerialized]
+        private List<IOverrideOrigin> _overrideOrigins;
+        [NonSerialized]
+        private bool _isRuntimeInstance;
+
+        List<IOverrideOrigin> IOverridableSettings.OverrideOrigins => _overrideOrigins;
+        OverrideOptions IOverridableSettings.OverrideOptions => (Attribute as IRuntimeSettingsAttribute)?.OverrideOptions ?? OverrideOptions.None;
+        bool IOverridableSettings.IsRuntimeInstance => _isRuntimeInstance;
 
         internal sealed override void InitializeInstance()
         {
+            var runtimeSettingsAttribute = Attribute as IRuntimeSettingsAttribute;
+            if (runtimeSettingsAttribute == null || runtimeSettingsAttribute.OverrideOptions == OverrideOptions.None
+#if UNITY_EDITOR
+                || EditorApplication.isPlayingOrWillChangePlaymode == false
+#endif
+            )
+                return;
+
             T runtimeInstance = null;
+            var overrideOptions = runtimeSettingsAttribute.OverrideOptions;
 
-            // Load runtime overrides from json file if it's allowed and we're actually in runtime.
-            if (Attribute is IRuntimeSettingsAttribute && (Attribute as IRuntimeSettingsAttribute).AllowsFileOverrides()
-#if UNITY_EDITOR
-                          && EditorApplication.isPlayingOrWillChangePlaymode
-#endif
-            )
-                runtimeInstance = LoadInitialRuntimeFileOverrides();
+            // Load runtime overrides from json file if it's allowed
+            if (overrideOptions.HasFlag(OverrideOptions.File))
+                LoadInitialRuntimeFileOverrides(ref runtimeInstance);
 
-            // Load runtime overrides from commandline if it's allowed and we're actually in runtime.
-            if (Attribute is IRuntimeSettingsAttribute && (Attribute as IRuntimeSettingsAttribute).AllowsCommandlineOverrides()
-#if UNITY_EDITOR
-                          && EditorApplication.isPlayingOrWillChangePlaymode
-#endif
-            )
-                runtimeInstance = LoadRuntimeCommandlineOverrides(runtimeInstance);
+            // Load runtime overrides from commandline if it's allowed
+            if (overrideOptions.HasFlag(OverrideOptions.Commandline))
+                LoadRuntimeCommandlineOverrides(ref runtimeInstance);
 
-            if(runtimeInstance != null)
+            // Load runtime overrides from custom in-memory place if it's allowed
+            if (overrideOptions.HasFlag(OverrideOptions.InMemory))
+                LoadInitialInMemoryOverrides(ref runtimeInstance);
+
+            if (overrideOptions.HasFlag(OverrideOptions.FileWatcher) || overrideOptions.HasFlag(OverrideOptions.InMemoryDeferred))
             {
+                // Make sure to retrieve sync context so we react on the main thread
+                Application.onBeforeRender += FetchSyncContext;
+
+                // If there is not runtime instance by now, we should create one.
+                // We do not know if there will be changes coming in later during
+                // runtime either via file or in-memory. 
+                // By creating a runtime instance now we can be sure the instance
+                // being requested now will be the same.
+                if(runtimeInstance == null)
+                {
+                    runtimeInstance = ScriptableObject.Instantiate(_instance);
+                    SetRuntimeInstanceName(runtimeInstance);
+                }
+            }
+
+            if (runtimeInstance != null)
+            {
+                var overridesString = SetRuntimeInstanceName(runtimeInstance);
+
+                Debug.Log($"Created {typeof(T).Name} runtime instance {overridesString}");
+
+#if UNITY_EDITOR
+                EditorApplication.playModeStateChanged -= EditorApplication_playModeStateChanged;
+                EditorApplication.playModeStateChanged += EditorApplication_playModeStateChanged;
+#endif
+
                 _instance = runtimeInstance;
+                _instance._isRuntimeInstance = true;
             }
         }
 
-        internal static T LoadRuntimeCommandlineOverrides(T runtimeInstance)
+        private static string SetRuntimeInstanceName(T runtimeInstance)
         {
-            var args = CommandlineHelper.SettingsArgs;
-
-            if(args == null)
-                return runtimeInstance;
-
-            foreach (var arg in args)
-            {
-                T localRuntimeInstance = null;
-                var propertyPathParts = arg.PropertyPathParts;
-                try
-                {
-                    var propertyPathSettingsName = propertyPathParts[0];
-                    if (propertyPathSettingsName == Filename || propertyPathSettingsName == typeof(T).Name)
-                    {
-                        var root = new JObject();
-                        var current = root;
-                        for (var i = 1; i < propertyPathParts.Length; i++)
-                        {
-                            if (propertyPathParts.Length - 1 == i)
-                            {
-                                current.Add(propertyPathParts[i], JValue.CreateString(arg.Value));
-                            }
-                            else
-                            {
-                                current.Add(propertyPathParts[i], current = new JObject());
-                            }
-                        }
-
-                        localRuntimeInstance = CreateCopy(runtimeInstance);
-
-                        if (_jsonSerializer == null)
-                            _jsonSerializer = JsonSerializer.Create(_jsonSerializerSettings);
-
-                        using (var jsonReader = root.CreateReader())
-                            _jsonSerializer.Populate(jsonReader, localRuntimeInstance);
-
-                        if (localRuntimeInstance != runtimeInstance)
-                        {
-                            SafeDestroy(runtimeInstance);
-                            runtimeInstance = localRuntimeInstance;
-                        }
-
-                        AddCommandlineOverrideOrigin(runtimeInstance, arg.OriginalArgument);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogError($"Error loading overrides from commandline argument '{arg}' for {typeof(T).Name}\n{ex}");
-
-                    if (localRuntimeInstance)
-                    {
-                        SafeDestroy(localRuntimeInstance);
-                    }
-                }
-            }
-
-            return runtimeInstance;
-        }
-
-        private static void SafeDestroy(UnityEngine.Object obj)
-        {
-#if UNITY_EDITOR
-            if (Application.isPlaying == false)
-                ScriptableObject.DestroyImmediate(obj);
-            else
-#endif
-                ScriptableObject.Destroy(obj);
-        }
-
-        private static T CreateCopy(T runtimeInstance)
-        {
-            return runtimeInstance == null ? Instantiate(_instance) : Instantiate(runtimeInstance);
-        }
-
-        private static T Instantiate(T runtimeInstance)
-        {
-            var result = ScriptableObject.Instantiate(runtimeInstance);
-            (result as IOverridableSettings).OverrideOrigins = (runtimeInstance as IOverridableSettings).OverrideOrigins;
-
-            return result;
-        }
-
-        internal static T LoadInitialRuntimeFileOverrides()
-        {
-            var runtimeInstance = LoadOverridesFromAllFiles(null, fromWatcher: false);
-
-            if (runtimeInstance == null)
-                return null;
-
-#if UNITY_EDITOR
-            EditorApplication.playModeStateChanged -= EditorApplication_playModeStateChanged;
-            EditorApplication.playModeStateChanged += EditorApplication_playModeStateChanged;
-#endif
-
             var overridableSettings = (IOverridableSettings)runtimeInstance;
-            var overridesString = $"with overrides from file{(overridableSettings.OverrideOrigins.Count > 1 ? "s" : "")}: {string.Join(", ", overridableSettings.OverrideOrigins)}";
-            Debug.Log($"Created {typeof(T).Name} runtime instance {overridesString}");
-
+            var overridesString = overridableSettings.OverrideOrigins == null ?
+                "with no overrides yet" :
+                $"with overrides from: {string.Join(", ", overridableSettings.OverrideOrigins.Select(oo => oo.ToString()))}";
             runtimeInstance.name = $"{Instance.name} ({overridesString})";
-
-            if ((Attribute as IRuntimeSettingsAttribute).AllowsFileWatchers())
-                SetupOriginFileWatchers(overridableSettings);
-
-            return runtimeInstance;
-        }
-
-        #region filewatchers
-        private static void SetupOriginFileWatchers(IOverridableSettings overridableSettings)
-        {
-            overridableSettings.UseOriginFileWatchers = true;
-
-            Application.onBeforeRender += FetchSyncContext;
-
-            foreach (var fileOrigins in overridableSettings.OverrideOrigins.OfType<FileOverrideOrgin>())
-            {
-                var fsw = new FileSystemWatcher(Path.GetDirectoryName(Path.GetFullPath(fileOrigins.FilePath)), Path.GetFileName(fileOrigins.FilePath));
-                fsw.NotifyFilter = NotifyFilters.LastWrite;
-                fsw.Changed += OverrideOriginFileChanged;
-                fsw.EnableRaisingEvents = true;
-
-                if (_originFileWatchers == null)
-                    _originFileWatchers = new List<FileSystemWatcher>();
-                _originFileWatchers.Add(fsw);
-            }
+            return overridesString;
         }
 
         private static void FetchSyncContext()
         {
             Application.onBeforeRender -= FetchSyncContext;
             _syncContext = SynchronizationContext.Current;
+
+            while (_syncContextQueue.Count > 0)
+            {
+                var action = _syncContextQueue.Dequeue();
+                _syncContext.Post(_ => action(), null);
+            }
         }
 
-        private static void ClearOriginFileWatchers()
+        static void PostToMainThread(Action action)
         {
-            if (_originFileWatchers == null)
+            if (_syncContext == null)
+            {
+                _syncContextQueue.Enqueue(action);
                 return;
-
-            foreach (var fsw in _originFileWatchers)
-            {
-                fsw.EnableRaisingEvents = false;
-                fsw.Changed -= OverrideOriginFileChanged;
             }
 
-            _originFileWatchers = null;
-        }
-
-        private static void OverrideOriginFileChanged(object sender, FileSystemEventArgs e)
-        {
-            _syncContext.Post(_ =>
+            if (SynchronizationContext.Current == _syncContext)
             {
-                LoadOverridesFromAllFiles(_instance, fromWatcher: true);
-
-                var overridableSettings = (IOverridableSettings)_instance;
-
-                var filePaths = string.Join(", ", overridableSettings.OverrideOrigins.OfType<FileOverrideOrgin>().Select(foo => foo.FilePath));
-                var overridesString = $"with overrides from file{(overridableSettings.OverrideOrigins.Count > 1 ? "s" : "")}: {filePaths}";
-                Debug.Log($"Updated {typeof(T).Name} runtime instance {overridesString}");
-            }, null);
-        }
-        #endregion
-
-        private static T LoadOverridesFromAllFiles(T runtimeInstance, bool fromWatcher)
-        {
-            var mainJsonFilename = "Settings.json";
-            runtimeInstance = LoadOverridesFromFile(runtimeInstance, mainJsonFilename, fromWatcher, jsonPath: Filename);
-
-            var jsonFilename = Filename + ".json";
-            runtimeInstance = LoadOverridesFromFile(runtimeInstance, jsonFilename, fromWatcher);
-
-            return runtimeInstance;
-        }
-
-        private static T LoadOverridesFromFile(T runtimeInstance, string jsonFilePath, bool fromWatcher, string jsonPath = null)
-        {
-            T localRuntimeInstance = null;
-            try
-            {
-                if (Path.IsPathRooted(jsonFilePath) == false)
-                    jsonFilePath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", jsonFilePath));
-
-                if (File.Exists(jsonFilePath))
-                {
-                    using var jr = new JsonTextReader(File.OpenText(jsonFilePath))
-                    {
-                        DateParseHandling = DateParseHandling.None
-                    };
-
-                    JToken jToken = JObject.Load(jr);
-
-                    if (jToken == null)
-                        return runtimeInstance;
-
-                    if (jsonPath != null)
-                        jToken = jToken.SelectToken(jsonPath);
-
-                    if (jToken == null)
-                        return runtimeInstance;
-
-                    localRuntimeInstance = CreateCopy(runtimeInstance);
-
-                    if (_jsonSerializer == null)
-                        _jsonSerializer = JsonSerializer.Create(_jsonSerializerSettings);
-
-                    using (var jsonReader = jToken.CreateReader())
-                        _jsonSerializer.Populate(jsonReader, localRuntimeInstance);
-
-                    if (localRuntimeInstance != runtimeInstance)
-                    {
-                        SafeDestroy(runtimeInstance);
-                        runtimeInstance = localRuntimeInstance;
-                    }
-
-                    AddFileOverrideOrigin(runtimeInstance, jsonFilePath, fromWatcher);
-
-                    return runtimeInstance;
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"Error loading overrides from {jsonFilePath} for {typeof(T).Name}\n{ex}");
-
-                if (localRuntimeInstance)
-                {
-#if UNITY_EDITOR
-                    if (Application.isPlaying == false)
-                        ScriptableObject.DestroyImmediate(localRuntimeInstance);
-                    else
-#endif
-                        ScriptableObject.Destroy(localRuntimeInstance);
-                }
-            }
-
-            return runtimeInstance;
-        }
-
-        private static void AddFileOverrideOrigin(T instance, string filePath, bool fromWatcher)
-        {
-            var oi = ((IOverridableSettings)instance);
-            if (oi == null)
+                action();
                 return;
-
-            if (oi.OverrideOrigins == null)
-            {
-                oi.OverrideOrigins = new List<IOverrideOrigin>();
             }
 
-            if (fromWatcher)
-            {
-                oi.OverrideOrigins.Add(new FileWatcherOverrideOrgin(filePath));
-            }
-            else
-            {
-                oi.OverrideOrigins.Add(new FileOverrideOrgin(filePath));
-            }
+            _syncContext.Post(_ => action(), null);
         }
 
-        private static void AddCommandlineOverrideOrigin(T instance, string argument)
+        private static bool PopulateFromReader(ref T runtimeInstance, TextReader textReader, string jsonPath, bool throwWhenPathNotFound)
         {
-            var oi = ((IOverridableSettings)instance);
-            if (oi == null)
-                return;
-
-            if (oi.OverrideOrigins == null)
+            using var jr = new JsonTextReader(textReader)
             {
-                oi.OverrideOrigins = new List<IOverrideOrigin>();
-            }
+                DateParseHandling = DateParseHandling.None
+            };
 
-            oi.OverrideOrigins.Add(new CommandlineOverrideOrgin(argument));
+            JToken jToken = JObject.Load(jr);
+
+            if (jToken == null)
+                throw new Exception("Empty JToken");
+
+            if (jsonPath != null)
+                jToken = jToken.SelectToken(jsonPath, throwWhenPathNotFound);
+
+            if (jToken == null)
+                return false;
+
+            PopulateFromJToken(ref runtimeInstance, jToken);
+
+            return true;
+        }
+
+        private static void PopulateFromJToken(ref T runtimeInstance, JToken jToken)
+        {
+            if (runtimeInstance == null)
+                runtimeInstance = ScriptableObject.Instantiate(_instance);
+
+            if (_jsonSerializer == null)
+                _jsonSerializer = JsonSerializer.Create(_jsonSerializerSettings);
+
+            using (var jsonReader = jToken.CreateReader())
+                _jsonSerializer.Populate(jsonReader, runtimeInstance);
         }
 
 #if UNITY_EDITOR
@@ -346,7 +243,8 @@ namespace SerializableSettings
 
             EditorApplication.playModeStateChanged -= EditorApplication_playModeStateChanged;
 
-            ClearOriginFileWatchers();
+            ClearFileWatchers();
+            ClearInMemoryEventListener();
 
             _instance = null;
             Initialize();

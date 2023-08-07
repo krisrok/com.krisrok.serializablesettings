@@ -5,6 +5,8 @@ using System;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
+using System.Collections.Generic;
+using System.Linq;
 
 #if ODIN_INSPECTOR
 using Sirenix.OdinInspector;
@@ -54,7 +56,7 @@ namespace SerializableSettings.Editor
             _settingsInternals = _settingsScriptableObject as ISettingsInternals;
             _serializableSettings = _settingsScriptableObject as ISerializableSettings;
             _overridableSettings = _settingsScriptableObject as IOverridableSettings;
-            _isRuntimeInstance = string.IsNullOrEmpty( AssetDatabase.GetAssetPath( _settingsScriptableObject ) );
+            _isRuntimeInstance = _overridableSettings?.IsRuntimeInstance ?? false;
 
             _hasHideMonoScriptAttribute = _settingsScriptableObject.GetType().GetCustomAttributes( typeof( HideMonoScriptAttribute ), true ).Length > 0;
 #if ODIN_INSPECTOR
@@ -168,14 +170,24 @@ namespace SerializableSettings.Editor
 
                 GUILayout.Space( 10 );
 
-                if( _overridableSettings.UseOriginFileWatchers )
+                var deferredStuff = new List<string>();
+                if (_overridableSettings.OverrideOptions.HasFlag(OverrideOptions.FileWatcher))
+                    deferredStuff.Add("file watchers");
+                if (_overridableSettings.OverrideOptions.HasFlag(OverrideOptions.InMemoryDeferred))
+                    deferredStuff.Add("deferred in-memory changes");
+
+                if(deferredStuff.Count > 0)
                 {
-                    GUILayout.Label( $"Filewatchers are active. Beware of the loading order!" );
+                    GUILayout.Label( $"Overrides from {string.Join(" and ", deferredStuff)} are active. Beware of the loading order!" );
                 }
 
                 GUILayout.Space( 10 );
 
-                if( _overridableSettings.OverrideOrigins != null )
+                if( _overridableSettings.OverrideOrigins == null )
+                {
+                    GUILayout.Label($"No overrides haved been loaded yet.");
+                }
+                else
                 {
                     GUILayout.Label( $"Overrides have been loaded in following order:" );
 

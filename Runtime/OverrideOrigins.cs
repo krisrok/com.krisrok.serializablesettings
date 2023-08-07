@@ -37,4 +37,15 @@
         public string Argument { get; }
         public override string ToString() => $"Commandline: {Argument}";
     }
+
+    internal struct InMemoryOverrideOrigin : IOverrideOrigin
+    {
+        public InMemoryOverrideOrigin(string description) : this()
+        {
+            Description = description;
+        }
+
+        public string Description { get; }
+        public override string ToString() => $"In-Memory: {Description}";
+    }
 }

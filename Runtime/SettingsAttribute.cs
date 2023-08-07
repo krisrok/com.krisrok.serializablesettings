@@ -40,13 +40,16 @@ namespace SerializableSettings
         /// Declares an <see cref="SerializableSettings{T}"/> class to be used as runtime settings
         /// which can be configured using the Project Settings window.
         /// </summary>
-        /// <param name="displayPath">Path to the setting in the Project Settings window. If omitted, the class name will be used.</param>
-        public RuntimeProjectSettingsAttribute(string displayPath = null)
+        /// <param name="displayPath">Path to the setting in the Project Settings window.</param>
+        /// <param name="overrideOptions">Defines which override sources are permitted during runtime.</param>
+        public RuntimeProjectSettingsAttribute(string displayPath, OverrideOptions overrideOptions = OverrideOptions.None)
             : base(SettingsUsage.RuntimeProject, displayPath)
-        { }
+        {
+            OverrideOptions = overrideOptions;
+        }
 
         /// <summary>
-        /// Defines which override sources will be used during runtime.
+        /// Defines which override sources are permitted during runtime.
         /// </summary>
         public OverrideOptions OverrideOptions { get; set; }
 
@@ -132,8 +135,18 @@ namespace SerializableSettings
         /// </summary>
         Commandline = 1 << 2,
         /// <summary>
-        /// See <see cref="FileWatcher"/> and <see cref="Commandline"/>
+        /// Overrides will be applied from in-memory json strings.
+        /// See <see cref="InMemoryOverrides"/>.
         /// </summary>
-        All = FileWatcher | Commandline
+        InMemory = 1 << 3,
+        /// <summary>
+        /// <inheritdoc cref="InMemory"/>
+        /// Deferred changes will be applied during runtime, too.
+        /// </summary>
+        InMemoryDeferred = InMemory | 1 << 4,
+        /// <summary>
+        /// See <see cref="FileWatcher"/>, <see cref="Commandline"/> and <see cref="InMemory"/>.
+        /// </summary>
+        All = FileWatcher | Commandline | InMemoryDeferred
     }
 }
