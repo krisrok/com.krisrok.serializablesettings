@@ -3,7 +3,7 @@
 namespace SerializableSettings
 {
     // Specifies how the settings are used and when they are available.
-    public enum SettingsUsage
+    internal enum SettingsUsage
     {
         // Project-wide settings available at runtime.
         // Ex: Project Settings/Time
