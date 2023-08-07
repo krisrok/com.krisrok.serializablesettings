@@ -12,64 +12,88 @@ namespace SerializableSettings
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
     public abstract class SettingsAttributeBase : Attribute
     {
-        internal SettingsAttributeBase( SettingsUsage usage, string displayPath = null)
+        internal SettingsAttributeBase(SettingsUsage usage, string displayPath = null)
         {
             Usage = usage;
             DisplayPath = displayPath;
         }
 
-        // The type of settings (how and when they are used).
+        /// <summary>
+        /// Internal settings usage switch.
+        /// </summary>
         internal readonly SettingsUsage Usage;
 
-        // The display name and optional path in the settings dialog.
+        /// <summary>
+        /// Path to the setting in the Project Settings window. If null, the type's name is used.
+        /// </summary>
         public readonly string DisplayPath;
 
-        // The filename used to store the settings. If null, the type's name is used.
+        /// <summary>
+        /// The filename used to store the settings. If null, the type's name is used.
+        /// </summary>
         public readonly string Filename;
     }
 
     public class RuntimeProjectSettingsAttribute : SettingsAttributeBase, IRuntimeSettingsAttribute
     {
-        public RuntimeProjectSettingsAttribute(string displayPath = null )
-            : base(SettingsUsage.RuntimeProject, displayPath )
+        /// <summary>
+        /// Declares an <see cref="SerializableSettings{T}"/> class to be used as runtime settings
+        /// which can be configured using the Project Settings window.
+        /// </summary>
+        /// <param name="displayPath">Path to the setting in the Project Settings window. If omitted, the class name will be used.</param>
+        public RuntimeProjectSettingsAttribute(string displayPath = null)
+            : base(SettingsUsage.RuntimeProject, displayPath)
         { }
 
+        /// <summary>
+        /// Defines which override sources will be used during runtime.
+        /// </summary>
         public OverrideOptions OverrideOptions { get; set; }
 
-        [Obsolete( "Use " + nameof( OverrideOptions ) + " instead." )]
+        [Obsolete("Use " + nameof(OverrideOptions) + " instead.")]
         public bool allowRuntimeFileOverrides { get => this.AllowsFileOverrides(); set => OverrideOptions |= OverrideOptions.File; }
 
-        [Obsolete( "Use " + nameof( OverrideOptions ) + " instead." )]
+        [Obsolete("Use " + nameof(OverrideOptions) + " instead.")]
         public bool allowRuntimeFileWatchers { get => this.AllowsFileWatchers(); set => OverrideOptions |= OverrideOptions.FileWatcher; }
 
-        [Obsolete( "Use " + nameof( OverrideOptions ) + " instead." )]
+        [Obsolete("Use " + nameof(OverrideOptions) + " instead.")]
         public bool allowCommandlineArgsOverrides { get => this.AllowsCommandlineOverrides(); set => OverrideOptions |= OverrideOptions.Commandline; }
     }
 
     public class EditorProjectSettingsAttribute : SettingsAttributeBase
     {
-        public EditorProjectSettingsAttribute( string displayPath = null )
-            : base( SettingsUsage.EditorProject, displayPath )
+        /// <summary>
+        /// Declares an <see cref="Settings{T}"/> class to be used as editor-only settings
+        /// which can be configured using the 'Project Settings' window.
+        /// </summary>
+        /// <param name="displayPath">Path to the setting in the Project Settings window. If omited, it will be generated using the class name.</param>
+        public EditorProjectSettingsAttribute(string displayPath = null)
+            : base(SettingsUsage.EditorProject, displayPath)
         { }
     }
 
     public class EditorUserSettingsAttribute : SettingsAttributeBase
     {
-        public EditorUserSettingsAttribute( string displayPath = null )
-            : base( SettingsUsage.EditorUser, displayPath )
+        /// <summary>
+        /// Declares an <see cref="Settings{T}"/> class to be used as editor-only settings
+        /// which can be configured using the 'Preferences' window.
+        /// </summary>
+        /// <param name="displayPath">Path to the setting in the Project Settings window. If omited, it will be generated using the class name.</param>
+        public EditorUserSettingsAttribute(string displayPath = null)
+            : base(SettingsUsage.EditorUser, displayPath)
         { }
     }
 
     public interface IRuntimeSettingsAttribute
     {
 #pragma warning disable IDE1006 // Naming Styles
-        [Obsolete( "Use " + nameof( OverrideOptions ) + " instead." )]
+        [Obsolete("Use " + nameof(OverrideOptions) + " instead.")]
         bool allowRuntimeFileOverrides { get; set; }
 
-        [Obsolete( "Use " + nameof( OverrideOptions ) + " instead." )]
+        [Obsolete("Use " + nameof(OverrideOptions) + " instead.")]
         bool allowRuntimeFileWatchers { get; set; }
 
-        [Obsolete( "Use " + nameof( OverrideOptions ) + " instead." )]
+        [Obsolete("Use " + nameof(OverrideOptions) + " instead.")]
         bool allowCommandlineArgsOverrides { get; set; }
 #pragma warning restore IDE1006 // Naming Styles
 
@@ -82,9 +106,9 @@ namespace SerializableSettings
 
     public static class RuntimeSettingsAttributeExtensions
     {
-        public static bool AllowsFileOverrides( this IRuntimeSettingsAttribute attribute ) => ( attribute.OverrideOptions & OverrideOptions.File ) != 0;
-        public static bool AllowsFileWatchers( this IRuntimeSettingsAttribute attribute ) => ( attribute.OverrideOptions & OverrideOptions.FileWatcher ) != 0;
-        public static bool AllowsCommandlineOverrides( this IRuntimeSettingsAttribute attribute ) => ( attribute.OverrideOptions & OverrideOptions.Commandline ) != 0;
+        public static bool AllowsFileOverrides(this IRuntimeSettingsAttribute attribute) => (attribute.OverrideOptions & OverrideOptions.File) != 0;
+        public static bool AllowsFileWatchers(this IRuntimeSettingsAttribute attribute) => (attribute.OverrideOptions & OverrideOptions.FileWatcher) != 0;
+        public static bool AllowsCommandlineOverrides(this IRuntimeSettingsAttribute attribute) => (attribute.OverrideOptions & OverrideOptions.Commandline) != 0;
     }
 
     [Flags]

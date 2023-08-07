@@ -16,15 +16,20 @@ namespace SerializableSettings
         internal string Filename { get; }
     }
 
-    // Base class for project/users settings. Use the [Settings] attribute to
-    // specify its usage, display path, and filename.
-    // * Settings are stored in Assets/Settings/ folder.
-    // * Important! The user settings folder Assets/Settings/Editor/User/ must be
-    //   excluded from source control.
-    // * User settings will be placed in a subdirectory named the same as
-    //   the current project folder so that shallow cloning (symbolic links to
-    //   the Assets/ folder) can be used when testing multiplayer games.
-    // See: https://HextantStudios.com/unity-custom-settings/
+    /// <summary>
+    /// <para>
+    /// Base class for project/user settings.
+    /// </para>
+    /// <para>
+    /// Use <see cref="RuntimeProjectSettingsAttribute"/>, <see cref="EditorProjectSettingsAttribute"/> or <see cref="EditorUserSettingsAttribute"/>
+    /// to specify its usage, display path, and filename.
+    /// </para>
+    /// <para>
+    /// If you need advanced runtime settings with override capabilities,
+    /// use <see cref="SerializableSettings{T}"/> in conjunction with <see cref="RuntimeProjectSettingsAttribute"/>.
+    /// </para>
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
     public abstract class Settings<T> : ScriptableObject, ISettingsInternals where T : Settings<T>
     {
         [Obsolete("Use " + nameof(Instance) + " instead")]
