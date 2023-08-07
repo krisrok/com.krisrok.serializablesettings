@@ -1,5 +1,6 @@
-// Copyright 2021 by Hextant Studios. https://HextantStudios.com
-// This work is licensed under CC BY 4.0. http://creativecommons.org/licenses/by/4.0/
+﻿// Derivative of "https://github.com/hextantstudios/com.hextantstudios.utilities" 
+//  Original Copyright 2021 by Hextant Studios. https://HextantStudios.com
+//  Used under CC BY 4.0. http://creativecommons.org/licenses/by/4.0/
 using System;
 using System.IO;
 using UnityEditor;
@@ -17,7 +18,7 @@ namespace SerializableSettings.Editor
 
     // SettingsProvider helper used to display settings for a ScriptableObject
     // derived class.
-    public class ScriptableObjectSettingsProvider : SettingsProvider
+    internal class ScriptableObjectSettingsProvider : SettingsProvider
     {
         public ScriptableObjectSettingsProvider( Func<ScriptableObject> settingsGetter,
             SettingsScope scope, string displayPath ) :
