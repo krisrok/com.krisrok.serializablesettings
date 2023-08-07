@@ -1,7 +1,7 @@
-using Hextant;
+using SerializableSettings;
 using UnityEngine;
 
-[RuntimeProjectSettings("MySettings/#SCRIPTNAME#", allowRuntimeFileOverrides = true)]
+[RuntimeProjectSettings("MySettings/#SCRIPTNAME#", OverrideOptions = OverrideOptions.File)]
 public class #SCRIPTNAME# : SerializableSettings<#SCRIPTNAME#>
 {
 
