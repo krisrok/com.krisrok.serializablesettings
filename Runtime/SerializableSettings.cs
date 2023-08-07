@@ -41,13 +41,15 @@ namespace SerializableSettings
 
         internal sealed override void InitializeInstance()
         {
+            T runtimeInstance = null;
+
             // Load runtime overrides from json file if it's allowed and we're actually in runtime.
             if (Attribute is IRuntimeSettingsAttribute && (Attribute as IRuntimeSettingsAttribute).AllowsFileOverrides()
 #if UNITY_EDITOR
                           && EditorApplication.isPlayingOrWillChangePlaymode
 #endif
             )
-                _instance = LoadInitialRuntimeFileOverrides();
+                runtimeInstance = LoadInitialRuntimeFileOverrides();
 
             // Load runtime overrides from commandline if it's allowed and we're actually in runtime.
             if (Attribute is IRuntimeSettingsAttribute && (Attribute as IRuntimeSettingsAttribute).AllowsCommandlineOverrides()
@@ -55,70 +57,96 @@ namespace SerializableSettings
                           && EditorApplication.isPlayingOrWillChangePlaymode
 #endif
             )
-                _instance = LoadRuntimeCommandlineOverrides();
+                runtimeInstance = LoadRuntimeCommandlineOverrides(runtimeInstance);
+
+            if(runtimeInstance != null)
+            {
+                _instance = runtimeInstance;
+            }
         }
 
-        internal static T LoadRuntimeCommandlineOverrides()
+        internal static T LoadRuntimeCommandlineOverrides(T runtimeInstance)
         {
-            var args = Environment.GetCommandLineArgs();
-            var runtimeInstance = _instance;
+            var args = CommandlineHelper.SettingsArgs;
 
-            foreach (var settingsArg in args.Where(arg => arg.StartsWith("-settings:") || arg.StartsWith("-s:")))
+            if(args == null)
+                return runtimeInstance;
+
+            foreach (var arg in args)
             {
-                var colonIndex = settingsArg.IndexOf(':') + 1;
-                if (settingsArg.Length - colonIndex <= 0)
+                T localRuntimeInstance = null;
+                var propertyPathParts = arg.PropertyPathParts;
+                try
                 {
-                    Debug.LogWarning($"Invalid settings argument format ({settingsArg}): Missing assignment");
-                    continue;
-                }
-
-                var assignment = settingsArg.Substring(colonIndex);
-
-                var assignmentParts = assignment.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
-                if (assignmentParts.Length < 2)
-                {
-                    Debug.LogWarning($"Invalid settings argument format ({settingsArg}): Missing '='");
-                    continue;
-                }
-
-                var propertyPath = assignmentParts[0];
-                var value = assignmentParts[1];
-
-                var propertyPathParts = propertyPath.Split(new[] { '.' }, StringSplitOptions.RemoveEmptyEntries);
-                if (propertyPathParts.Length < 2)
-                {
-                    Debug.LogWarning($"Invalid settings argument format ({settingsArg}): Property path too short");
-                    continue;
-                }
-
-                var propertyPathSettingsName = propertyPathParts[0];
-                if (propertyPathSettingsName == Filename || propertyPathSettingsName == typeof(T).Name)
-                {
-                    var root = new JObject();
-                    var current = root;
-                    for (var i = 1; i < propertyPathParts.Length; i++)
+                    var propertyPathSettingsName = propertyPathParts[0];
+                    if (propertyPathSettingsName == Filename || propertyPathSettingsName == typeof(T).Name)
                     {
-                        if (propertyPathParts.Length - 1 == i)
+                        var root = new JObject();
+                        var current = root;
+                        for (var i = 1; i < propertyPathParts.Length; i++)
                         {
-                            current.Add(propertyPathParts[i], JValue.CreateString(value));
+                            if (propertyPathParts.Length - 1 == i)
+                            {
+                                current.Add(propertyPathParts[i], JValue.CreateString(arg.Value));
+                            }
+                            else
+                            {
+                                current.Add(propertyPathParts[i], current = new JObject());
+                            }
                         }
-                        else
+
+                        localRuntimeInstance = CreateCopy(runtimeInstance);
+
+                        if (_jsonSerializer == null)
+                            _jsonSerializer = JsonSerializer.Create(_jsonSerializerSettings);
+
+                        using (var jsonReader = root.CreateReader())
+                            _jsonSerializer.Populate(jsonReader, localRuntimeInstance);
+
+                        if (localRuntimeInstance != runtimeInstance)
                         {
-                            current.Add(propertyPathParts[i], current = new JObject());
+                            SafeDestroy(runtimeInstance);
+                            runtimeInstance = localRuntimeInstance;
                         }
+
+                        AddCommandlineOverrideOrigin(runtimeInstance, arg.OriginalArgument);
                     }
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"Error loading overrides from commandline argument '{arg}' for {typeof(T).Name}\n{ex}");
 
-                    if (runtimeInstance == null)
-                        runtimeInstance = ScriptableObject.Instantiate(_instance);
-
-                    using (var jsonReader = root.CreateReader())
-                        _jsonSerializer.Populate(jsonReader, _instance);
-
-                    AddCommandlineOverrideOrigin(runtimeInstance, settingsArg);
+                    if (localRuntimeInstance)
+                    {
+                        SafeDestroy(localRuntimeInstance);
+                    }
                 }
             }
 
             return runtimeInstance;
+        }
+
+        private static void SafeDestroy(UnityEngine.Object obj)
+        {
+#if UNITY_EDITOR
+            if (Application.isPlaying == false)
+                ScriptableObject.DestroyImmediate(obj);
+            else
+#endif
+                ScriptableObject.Destroy(obj);
+        }
+
+        private static T CreateCopy(T runtimeInstance)
+        {
+            return runtimeInstance == null ? Instantiate(_instance) : Instantiate(runtimeInstance);
+        }
+
+        private static T Instantiate(T runtimeInstance)
+        {
+            var result = ScriptableObject.Instantiate(runtimeInstance);
+            (result as IOverridableSettings).OverrideOrigins = (runtimeInstance as IOverridableSettings).OverrideOrigins;
+
+            return result;
         }
 
         internal static T LoadInitialRuntimeFileOverrides()
@@ -237,14 +265,19 @@ namespace SerializableSettings
                     if (jToken == null)
                         return runtimeInstance;
 
-                    if (runtimeInstance == null)
-                        localRuntimeInstance = runtimeInstance = ScriptableObject.Instantiate(_instance);
+                    localRuntimeInstance = CreateCopy(runtimeInstance);
 
                     if (_jsonSerializer == null)
                         _jsonSerializer = JsonSerializer.Create(_jsonSerializerSettings);
 
                     using (var jsonReader = jToken.CreateReader())
-                        _jsonSerializer.Populate(jsonReader, runtimeInstance);
+                        _jsonSerializer.Populate(jsonReader, localRuntimeInstance);
+
+                    if (localRuntimeInstance != runtimeInstance)
+                    {
+                        SafeDestroy(runtimeInstance);
+                        runtimeInstance = localRuntimeInstance;
+                    }
 
                     AddFileOverrideOrigin(runtimeInstance, jsonFilePath, fromWatcher);
 
