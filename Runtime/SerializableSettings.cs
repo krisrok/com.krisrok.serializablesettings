@@ -60,8 +60,7 @@ namespace SerializableSettings
 
         internal static T LoadRuntimeCommandlineOverrides()
         {
-            //var args = Environment.GetCommandLineArgs();
-            var args = new[] { "unity.exe", "-test1", "-settings:TestSettings.Sub.Integer=55", "-s:TestSettings.Boolean=false" };
+            var args = Environment.GetCommandLineArgs();
             var runtimeInstance = _instance;
 
             foreach( var settingsArg in args.Where( arg => arg.StartsWith( "-settings:" ) || arg.StartsWith( "-s:" ) ) )
