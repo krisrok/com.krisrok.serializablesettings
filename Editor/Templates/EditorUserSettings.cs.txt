@@ -1,0 +1,11 @@
+using SerializableSettings;
+using UnityEngine;
+
+[EditorUserSettings("MySettings/#SCRIPTNAME#")]
+public class #SCRIPTNAME# : SerializableSettings<#SCRIPTNAME#>
+{
+    // Settings defined here can be accessed during runtime and in the Unity Editor.
+    // Access the settings via Edit/Preferences/... and via code: #SCRIPTNAME#.Instance.
+    // These settings can be different on a per-user (or per-developer) basis. Think favourite editor color.
+    // Please exclude the Assets/Settings/Editor/User/ folder in e.g. your .gitignore file.
+}

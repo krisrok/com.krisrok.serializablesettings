@@ -1,0 +1,9 @@
+using SerializableSettings;
+using UnityEngine;
+
+[EditorProjectSettings("MySettings/#SCRIPTNAME#")]
+public class #SCRIPTNAME# : Settings<#SCRIPTNAME#>
+{
+    // Settings defined here are only accessable in the Unity Editor.
+    // Access the settings via Edit/Project Settings/... and via code: #SCRIPTNAME#.Instance.
+}
