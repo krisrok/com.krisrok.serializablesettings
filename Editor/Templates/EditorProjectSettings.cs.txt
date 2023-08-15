@@ -1,9 +1,12 @@
+#if UNITY_EDITOR
 using SerializableSettings;
-using UnityEngine;
+using SerializableSettings.Editor;
 
 [EditorProjectSettings("MySettings/#SCRIPTNAME#")]
 public class #SCRIPTNAME# : Settings<#SCRIPTNAME#>
 {
     // Settings defined here are only accessable in the Unity Editor.
+    // Make sure to keep the #if UNITY_EDITOR directives or put the script into an Editor-only assembly.
     // Access the settings via Edit/Project Settings/... and via code: #SCRIPTNAME#.Instance.
 }
+#endif

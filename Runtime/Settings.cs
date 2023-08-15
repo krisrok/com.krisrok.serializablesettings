@@ -8,6 +8,7 @@ using System.Reflection;
 using UnityEditor;
 using UnityEngine;
 using System.Linq;
+using SerializableSettings.Editor;
 
 namespace SerializableSettings
 {
@@ -60,7 +61,11 @@ namespace SerializableSettings
             // Verify there was a [Settings] attribute.
             if (Attribute == null)
             {
-                var availableAttributes = string.Join(",", new[] { nameof(EditorUserSettingsAttribute), nameof(EditorProjectSettingsAttribute), nameof(RuntimeProjectSettingsAttribute) });
+                var availableAttributes = string.Join(",", new[] { nameof(RuntimeProjectSettingsAttribute)
+#if UNITY_EDITOR
+                     , nameof(EditorUserSettingsAttribute), nameof(EditorProjectSettingsAttribute)
+#endif
+                });
                 Debug.LogError($"SettingsAttribute missing for type: {typeof(T).Name}. Please use either: {availableAttributes}");
                 return null;
             }

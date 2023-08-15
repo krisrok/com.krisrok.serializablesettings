@@ -1,5 +1,4 @@
 using SerializableSettings;
-using UnityEngine;
 
 [RuntimeProjectSettings("MySettings/#SCRIPTNAME#", OverrideOptions = OverrideOptions.None)]
 public class #SCRIPTNAME# : SerializableSettings<#SCRIPTNAME#>
