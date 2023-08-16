@@ -16,7 +16,7 @@ namespace SerializableSettings.Editor
         [Obsolete("Settings classes are now collected automatically. If you still want to use your own SettingsProvider consider using the overload with type inference instead: SettingsExtensions.GetSettingsProvider(() => instance)")]
         public static SettingsProvider GetSettingsProvider<T>() where T : Settings<T>
         {
-            var instanceProp = typeof(Settings<T>).GetProperty(nameof(Settings<T>.instance), BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+            var instanceProp = typeof(Settings<T>).GetProperty(nameof(Settings<T>.Instance), BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
             return new ScriptableObjectSettingsProvider(() => (ScriptableObject)instanceProp.GetValue(null),
                 Settings<T>.Attribute is EditorUserSettingsAttribute ?
                 SettingsScope.User : SettingsScope.Project,
