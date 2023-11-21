@@ -38,7 +38,7 @@ namespace SerializableSettings
 
             //var settingsArgRegex = new Regex(@"^-{1,2}(setting)?s:(?<propertyPath>.*?)=(?<value>.*)");
 
-            foreach (var settingsArg in args.Where(arg => arg.StartsWith("-settings:") || arg.StartsWith("-s:")))
+            foreach (var settingsArg in args.Where(arg => arg.StartsWith("--settings:") || arg.StartsWith("-settings:") || arg.StartsWith("-s:")))
             {
                 var colonIndex = settingsArg.IndexOf(':') + 1;
                 if (settingsArg.Length - colonIndex <= 0)
