@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace SerializableSettings
 {
-    internal class UnityEngineObjectContractResolver : DefaultContractResolver
+    public class UnityEngineObjectContractResolver : DefaultContractResolver
     {
         internal static UnityEngineObjectContractResolver Instance { get; } = new UnityEngineObjectContractResolver();
 
