@@ -11,7 +11,7 @@ namespace SerializableSettings
 {
     public class UnityEngineObjectContractResolver : DefaultContractResolver
     {
-        internal static UnityEngineObjectContractResolver Instance { get; } = new UnityEngineObjectContractResolver();
+        public static UnityEngineObjectContractResolver Instance { get; } = new UnityEngineObjectContractResolver();
 
         private static string[] _ignoredMemberNames = new[] { nameof( UnityEngine.Object.name ), nameof( UnityEngine.Object.hideFlags ) };
 
