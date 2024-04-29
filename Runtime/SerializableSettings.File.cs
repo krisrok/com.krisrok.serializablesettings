@@ -9,6 +9,8 @@ namespace SerializableSettings
     public abstract partial class SerializableSettings<T> : Settings<T>, ISerializableSettings, IOverridableSettings
         where T : SerializableSettings<T>
     {
+        private static List<FileSystemWatcher> _originFileWatchers;
+
         internal static void LoadInitialRuntimeFileOverrides(ref T runtimeInstance)
         {
             LoadOverridesFromAllFiles(ref runtimeInstance, fromWatcher: false);

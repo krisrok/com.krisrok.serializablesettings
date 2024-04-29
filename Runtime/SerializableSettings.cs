@@ -80,8 +80,6 @@ namespace SerializableSettings
     public abstract partial class SerializableSettings<T> : Settings<T>, ISerializableSettings, IOverridableSettings
         where T : SerializableSettings<T>
     {
-        private static List<FileSystemWatcher> _originFileWatchers;
-        
         private static SynchronizationContext _syncContext;
         private static Queue<Action> _syncContextQueue = new Queue<Action>();
 
