@@ -1,6 +1,7 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -17,7 +18,8 @@ namespace SerializableSettings
 
         private static Regex _backingFieldRegex = new Regex( "<(.*?)>k__BackingField", RegexOptions.Compiled );
 
-        private UnityEngineObjectContractResolver() { }
+        private UnityEngineObjectContractResolver()
+        { }
 
         protected override List<MemberInfo> GetSerializableMembers( Type objectType )
         {
@@ -113,7 +115,50 @@ namespace SerializableSettings
                 }
             }
 
+            if (IsMemberCollectionType(member))
+            {
+                SetCollectionObjectCreationHandling(member, jsonProperty);
+            }
+
             return jsonProperty;
+        }
+
+        private void SetCollectionObjectCreationHandling(MemberInfo member, JsonProperty jsonProperty)
+        {
+            // Keep as is if there's a converter for the specific property
+            if (jsonProperty.Converter != null)
+                return;
+
+            // Keep as is if not explictly set by attribute
+            var jsonPropertyAttribute = member.GetCustomAttribute<JsonPropertyAttribute>();
+            if (jsonPropertyAttribute != null)
+            {
+                if (jsonPropertyAttribute.ObjectCreationHandling != ObjectCreationHandling.Auto)
+                {
+                    return;
+                }
+            }
+
+            // Default: Replace
+            jsonProperty.ObjectCreationHandling = ObjectCreationHandling.Replace;
+        }
+
+        private static bool IsMemberCollectionType(MemberInfo member)
+        {
+            switch (member)
+            {
+                case FieldInfo fieldInfo:
+                    return IsCollectionType(fieldInfo.FieldType);
+                case PropertyInfo propertyInfo:
+                    return IsCollectionType(propertyInfo.PropertyType);
+                default:
+                    throw new NotSupportedException();
+            }
+        }
+
+        private static bool IsCollectionType(Type type)
+        {
+            return type.IsArray || typeof(ICollection).IsAssignableFrom(type);
         }
     }
 }
