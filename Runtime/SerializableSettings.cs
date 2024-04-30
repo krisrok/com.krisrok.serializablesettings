@@ -23,6 +23,11 @@ namespace SerializableSettings
         internal OverrideOptions OverrideOptions { get; }
     }
 
+    public delegate void SettingsChangedDelegate();
+
+#if ODIN_INSPECTOR_3
+    [Sirenix.OdinInspector.OnValueChanged("@this.RaiseChanged()", includeChildren: true)]
+#endif
     public abstract partial class SerializableSettings<T> : Settings<T>, ISerializableSettings, IOverridableSettings
         where T : SerializableSettings<T>
     {
@@ -45,6 +50,33 @@ namespace SerializableSettings
         List<IOverrideOrigin> IOverridableSettings.OverrideOrigins => _overrideOrigins;
         OverrideOptions IOverridableSettings.OverrideOptions => (Attribute as IRuntimeSettingsAttribute)?.OverrideOptions ?? OverrideOptions.None;
         bool IOverridableSettings.IsRuntimeInstance => _isRuntimeInstance;
+
+        private event SettingsChangedDelegate _changed;
+
+        public event SettingsChangedDelegate Changed
+        {
+            add
+            {
+                var runtimeSettingsAttribute = Attribute as IRuntimeSettingsAttribute;
+                if (runtimeSettingsAttribute == null ||
+                    (runtimeSettingsAttribute.OverrideOptions.HasFlag(OverrideOptions.InMemoryDeferred) == false &&
+                    runtimeSettingsAttribute.OverrideOptions.HasFlag(OverrideOptions.FileWatcher) == false))
+                {
+                    Debug.LogWarning($"{GetType().Name} will never raise {nameof(Changed)} event. It is not flagged for deferred overrides " +
+                        $"({nameof(OverrideOptions)}.{nameof(OverrideOptions.FileWatcher)}, " +
+                        $"{nameof(OverrideOptions)}.{nameof(OverrideOptions.InMemoryDeferred)}).");
+                }
+
+                _changed += value;
+            }
+
+            remove => _changed -= value;
+        }
+
+        protected void RaiseChanged()
+        {
+            _changed?.Invoke();
+        }
 
         internal sealed override void InitializeInstance()
         {

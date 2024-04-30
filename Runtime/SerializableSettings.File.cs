@@ -62,6 +62,8 @@ namespace SerializableSettings
                 {
                     var overridesString = SetRuntimeInstanceName(_instance);
 
+                    _instance._changed?.Invoke();
+
                     Debug.Log($"Updated {typeof(T).Name} runtime instance {overridesString}");
                 }
             });
