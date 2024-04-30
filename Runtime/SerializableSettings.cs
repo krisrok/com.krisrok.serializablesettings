@@ -116,13 +116,13 @@ namespace SerializableSettings
                 if(runtimeInstance == null)
                 {
                     runtimeInstance = ScriptableObject.Instantiate(_instance);
-                    SetRuntimeInstanceName(runtimeInstance);
+                    UpdateRuntimeInstanceName(runtimeInstance);
                 }
             }
 
             if (runtimeInstance != null)
             {
-                var overridesString = SetRuntimeInstanceName(runtimeInstance);
+                var overridesString = UpdateRuntimeInstanceName(runtimeInstance);
 
                 Debug.Log($"Created {typeof(T).Name} runtime instance {overridesString}");
 
@@ -136,7 +136,7 @@ namespace SerializableSettings
             }
         }
 
-        private static string SetRuntimeInstanceName(T runtimeInstance)
+        private static string UpdateRuntimeInstanceName(T runtimeInstance)
         {
             var overridableSettings = (IOverridableSettings)runtimeInstance;
             var overridesString = overridableSettings.OverrideOrigins == null ?

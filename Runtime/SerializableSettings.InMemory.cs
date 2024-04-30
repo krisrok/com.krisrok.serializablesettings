@@ -63,7 +63,7 @@ namespace SerializableSettings
 
                 if (changed)
                 {
-                    var overridesString = SetRuntimeInstanceName(_instance);
+                    var overridesString = UpdateRuntimeInstanceName(_instance);
 
                     _instance._changed?.Invoke();
 
