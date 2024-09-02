@@ -1,6 +1,6 @@
 {
   "name": "com.krisrok.serializablesettings",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "displayName": "Serializable Settings \u2042",
   "description": "ScriptableObject-based settings with runtime overrides.",
   "unity": "2020.1",
