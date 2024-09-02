@@ -200,6 +200,23 @@ namespace SerializableSettings
         }
 
         /// <summary>
+        /// Opens the corresponding Project Settings or Preferences tab
+        /// </summary>
+        public static void OpenInEditor()
+        {
+#if UNITY_EDITOR
+            if (Attribute.Usage == SettingsUsage.EditorUser)
+            {
+                SettingsService.OpenUserPreferences(DisplayPath);
+            }
+            else
+            {
+                SettingsService.OpenProjectSettings(DisplayPath);
+            }
+#endif
+        }
+
+        /// <summary>
         /// Called after settings changed using the GUI or <see cref="Set{S}(ref S, S)"/>
         /// </summary>
         protected virtual void OnValidate() { }
