@@ -209,8 +209,15 @@ namespace SerializableSettings.Editor
                 GUILayout.Space( 10 );
             }
 
+            EditorGUI.BeginChangeCheck();
+
             // Draw the editor's GUI.
             _editor.OnInspectorGUI();
+
+            if(EditorGUI.EndChangeCheck())
+            {
+                _settingsInternals.RaiseChangedInternal();
+            }
 
             // Reset label width and indent.
             GUILayout.EndVertical();

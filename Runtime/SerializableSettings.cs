@@ -25,9 +25,6 @@ namespace SerializableSettings
 
     public delegate void SettingsChangedDelegate();
 
-#if ODIN_INSPECTOR_3
-    [Sirenix.OdinInspector.OnValueChanged("@this.RaiseChanged()", includeChildren: true)]
-#endif
     public abstract partial class SerializableSettings<T> : Settings<T>, ISerializableSettings, IOverridableSettings
         where T : SerializableSettings<T>
     {
@@ -73,7 +70,7 @@ namespace SerializableSettings
             remove => _changed -= value;
         }
 
-        protected void RaiseChanged()
+        override protected void RaiseChanged()
         {
             _changed?.Invoke();
         }

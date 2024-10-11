@@ -15,6 +15,7 @@ namespace SerializableSettings
     internal interface ISettingsInternals
     {
         internal string Filename { get; }
+        internal void RaiseChangedInternal();
     }
 
     /// <summary>
@@ -271,5 +272,12 @@ namespace SerializableSettings
 #endif
             }
         }
+
+        void ISettingsInternals.RaiseChangedInternal()
+        {
+            RaiseChanged();
+        }
+
+        protected abstract void RaiseChanged();
     }
 }
