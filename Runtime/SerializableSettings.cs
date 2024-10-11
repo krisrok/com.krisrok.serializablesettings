@@ -55,11 +55,11 @@ namespace SerializableSettings
             add
             {
                 var runtimeSettingsAttribute = Attribute as IRuntimeSettingsAttribute;
-                if (runtimeSettingsAttribute == null ||
+                if (runtimeSettingsAttribute != null &&
                     (runtimeSettingsAttribute.OverrideOptions.HasFlag(OverrideOptions.InMemoryDeferred) == false &&
                     runtimeSettingsAttribute.OverrideOptions.HasFlag(OverrideOptions.FileWatcher) == false))
                 {
-                    Debug.LogWarning($"{GetType().Name} will never raise {nameof(Changed)} event. It is not flagged for deferred overrides " +
+                    Debug.LogWarning($"{GetType().Name} will never raise {nameof(Changed)} during runtime. It is not flagged for deferred overrides: " +
                         $"({nameof(OverrideOptions)}.{nameof(OverrideOptions.FileWatcher)}, " +
                         $"{nameof(OverrideOptions)}.{nameof(OverrideOptions.InMemoryDeferred)}).");
                 }
