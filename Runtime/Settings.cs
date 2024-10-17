@@ -13,8 +13,11 @@ using SerializableSettings.Editor;
 namespace SerializableSettings
 {
     internal interface ISettingsInternals
-    {
+{
         internal string Filename { get; }
+
+        // TODO: This is not really a good place for this method. It's just here because it was convenient.
+        // Only used by SerializableSettings but not by Settings, so non-runtime settings can't do anything with it.
         internal void RaiseChangedInternal();
     }
 
@@ -278,6 +281,7 @@ namespace SerializableSettings
             RaiseChanged();
         }
 
-        protected abstract void RaiseChanged();
+        protected virtual void RaiseChanged()
+        { }
     }
 }
