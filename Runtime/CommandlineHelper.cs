@@ -2,7 +2,6 @@
 using System.Linq;
 using System;
 using UnityEngine;
-using System.Text.RegularExpressions;
 
 namespace SerializableSettings
 {
@@ -16,20 +15,22 @@ namespace SerializableSettings
         }
 
         private static List<SettingsArg> _settingsArgs;
+        private static List<string> _settingsFiles;
+
         public static IEnumerable<SettingsArg> SettingsArgs
         {
             get
             {
                 if(_settingsArgs == null)
                 {
-                    _settingsArgs = ParseCommandlineArgs();
+                    _settingsArgs = ParseSettingArgsFromCommandlineArgs();
                 }
 
                 return _settingsArgs;
             }
         }
 
-        private static List<SettingsArg> ParseCommandlineArgs()
+        private static List<SettingsArg> ParseSettingArgsFromCommandlineArgs()
         {
             var args = Environment.GetCommandLineArgs();
             //var args = new[] { "unity.exe", "-test1", "-settings:TestSettings.Sub.Integer='Hello'", "-s:TestSettings.Boolean=true" };
@@ -75,6 +76,31 @@ namespace SerializableSettings
             }
 
             return result;
+        }
+
+
+        public static IEnumerable<string> SettingsFiles
+        {
+            get
+            {
+                if (_settingsFiles == null)
+                {
+                    _settingsFiles = ParseSettingsFilesFromCommandlineArgs();
+                }
+
+                return _settingsFiles;
+            }
+        }
+
+        private static List<string> ParseSettingsFilesFromCommandlineArgs()
+        {
+            var args = Environment.GetCommandLineArgs();
+            //var args = new[] { "unity.exe", "--settings-file:../A.json", "--settings-file:../B.json" };
+
+            return args
+                .Where(a => a.StartsWith("--settings-file:") || a.StartsWith("-settings-file:"))
+                .Select(a => a.Substring(a.IndexOf(':') + 1))
+                .ToList();
         }
 
     }

@@ -80,6 +80,11 @@ namespace SerializableSettings
             var jsonFilename = Filename + ".json";
             changed |= LoadOverridesFromFile(ref runtimeInstance, jsonFilename, fromWatcher);
 
+            foreach(var additionalJsonFile in CommandlineHelper.SettingsFiles)
+            {
+                changed |= LoadOverridesFromFile(ref runtimeInstance, additionalJsonFile, fromWatcher, jsonPath: typeof(T).Name);
+            }
+
             return changed;
         }
 
